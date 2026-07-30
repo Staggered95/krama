@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+/* =========================================
+   1. COLOR PALETTES (The Data Layer)
+   ========================================= */
+
+/* Default Theme: Dark Mode (Industrial Yellow) */
+:root {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  
+  --txt-primary: #f5f5f5;
+  --txt-muted: #a3a3a3;
+
+  --acc-primary: #eab308; /* Vivid Yellow */
+  --acc-hover: #facc15;
+
+  --stat-success: #22c55e;
+  --stat-error: #ef4444;
+  --stat-warning: #f59e0b;
+  
+  --bdr: #333333;
+}
+
+/* Light Mode Override (Rich Amber) */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f4f4f5;
+  
+  --txt-primary: #18181b;
+  --txt-muted: #71717a;
+
+  --acc-primary: #b45309; /* Deep Amber so white button text is readable */
+  --acc-hover: #d97706;
+
+  --stat-success: #16a34a;
+  --stat-error: #dc2626;
+  --stat-warning: #b45309;
+  
+  --bdr: #e4e4e7;
+}
+
+/* =========================================
+   2. TAILWIND MAPPING
+   ========================================= */
+@theme {
+  --color-background-primary: var(--bg-primary);
+  --color-background-secondary: var(--bg-secondary);
+
+  --color-text-primary: var(--txt-primary);
+  --color-text-muted: var(--txt-muted);
+
+  --color-accent-primary: var(--acc-primary);
+  --color-accent-hover: var(--acc-hover);
+
+  --color-success: var(--stat-success);
+  --color-error: var(--stat-error);
+  --color-warning: var(--stat-warning);
+
+  --color-border: var(--bdr);
+}
+
+
+/* =========================================
+   4. CUSTOM THEMED SCROLLBARS
+   ========================================= */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bdr);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--txt-muted);
+}
+
+
+
+/* =========================================
+   3. VIEW TRANSITION ANIMATION
+   ========================================= */
+
+/* Disable default cross-fade */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Animate the new theme coming in */
+::view-transition-new(root) {
+  animation: corner-reveal 1.0s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Force the old theme to stay perfectly still under the new theme */
+::view-transition-old(root) {
+  z-index: -1;
+}
+
+/* The clip-path circle grows from the bottom-left (where the button is) */
+@keyframes corner-reveal {
+  0% {
+    clip-path: circle(0% at 0% 100%);
+  }
+  100% {
+    /* 150% ensures the circle grows large enough to cover the top-right corner */
+    clip-path: circle(150% at 0% 100%); 
+  }
+}
+
+body {
+  @apply bg-background-primary text-text-primary; /* Removed transition classes */
+}

@@ -15,4 +15,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
 
     // Fetch all issues reported by a specific user
     List<Issue> findByReporterId(Long reporterId);
+
+    // Fetch all issues assigned to a specific user email
+    List<Issue> findByAssigneeEmail(String email);
 }

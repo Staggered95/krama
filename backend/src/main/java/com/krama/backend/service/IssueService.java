@@ -2,10 +2,13 @@ package com.krama.backend.service;
 
 import com.krama.backend.dto.IssueDto;
 import com.krama.backend.dto.IssueRequestDto;
+import com.krama.backend.dto.IssueHistoryDto;
 import com.krama.backend.entity.Issue;
+import com.krama.backend.entity.IssueHistory;
 import com.krama.backend.entity.Project;
 import com.krama.backend.entity.User;
 import com.krama.backend.repository.IssueRepository;
+import com.krama.backend.repository.IssueHistoryRepository;
 import com.krama.backend.repository.ProjectRepository;
 import com.krama.backend.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -22,16 +25,15 @@ public class IssueService {
     private final IssueRepository issueRepository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
-
-    // Hardcoding a reporter ID for now until Spring Security (JWT) is implemented
-    private final Long CURRENT_USER_ID = 1L;
+    private final IssueHistoryRepository issueHistoryRepository; // Inject the new repo
 
     public IssueDto createIssue(IssueRequestDto request) {
         Project project = projectRepository.findById(request.projectId())
                 .orElseThrow(() -> new EntityNotFoundException("Project not found"));
 
-        User reporter = userRepository.findById(CURRENT_USER_ID)
-                .orElseThrow(() -> new EntityNotFoundException("Reporter not found"));
+        // FIX: Dynamically get the first user instead of hardcoding ID 1L
+        User reporter = userRepository.findAll().stream().findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("No users exist in the database to act as reporter"));
 
         Issue issue = new Issue();
         issue.setTitle(request.title());
@@ -59,14 +61,34 @@ public class IssueService {
                 .collect(Collectors.toList());
     }
 
-    public IssueDto updateIssueStatus(Long issueId, String newStatus) {
+    // UPDATED: Now requires userEmail to record the audit trail
+    public IssueDto updateIssueStatus(Long issueId, String newStatus, String userEmail) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new EntityNotFoundException("Issue not found"));
 
-        // This automatically throws IllegalArgumentException if the status string is invalid
-        issue.setStatus(Issue.Status.valueOf(newStatus.toUpperCase()));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        return mapToDto(issueRepository.save(issue));
+        Issue.Status oldStatus = issue.getStatus();
+        Issue.Status targetStatus = Issue.Status.valueOf(newStatus.toUpperCase());
+
+        // Only log to history if the status actually changed
+        if (oldStatus != targetStatus) {
+            issue.setStatus(targetStatus);
+            issue = issueRepository.save(issue);
+
+            // Create and save the history record
+            IssueHistory history = new IssueHistory();
+            history.setIssue(issue);
+            history.setUser(user);
+            history.setFieldChanged("status");
+            history.setOldValue(oldStatus.name());
+            history.setNewValue(targetStatus.name());
+
+            issueHistoryRepository.save(history);
+        }
+
+        return mapToDto(issue);
     }
 
     public IssueDto assignIssue(Long issueId, Long assigneeId) {
@@ -84,6 +106,21 @@ public class IssueService {
         }
 
         return mapToDto(issueRepository.save(issue));
+    }
+
+    // NEW: Fetch history for the controller
+    public List<IssueHistoryDto> getIssueHistory(Long issueId) {
+        return issueHistoryRepository.findByIssueIdOrderByTimestampDesc(issueId)
+                .stream()
+                .map((IssueHistory h) -> new IssueHistoryDto( // <-- Explicitly added IssueHistory here
+                        h.getId(),
+                        h.getUser().getName(),
+                        h.getFieldChanged(),
+                        h.getOldValue(),
+                        h.getNewValue(),
+                        h.getTimestamp()
+                ))
+                .collect(Collectors.toList());
     }
 
     // Helper method to map Entity to DTO
@@ -104,5 +141,13 @@ public class IssueService {
                 issue.getCreatedAt(),
                 issue.getUpdatedAt()
         );
+    }
+
+    // NEW: Get all issues assigned to a user email
+    public List<IssueDto> getIssuesAssignedToUser(String email) {
+        return issueRepository.findByAssigneeEmail(email)
+                .stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
     }
 }
